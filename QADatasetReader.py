@@ -104,7 +104,11 @@ class PubMedQADatasetReader(DatasetReader):
             tokenized_ques = self.tokenizer.tokenize(ques)
             tokenized_ans = self.tokenizer.tokenize(ans)
             text_field = TextField(tokenized_ques, self.token_indexers)
-            label_field = TextField(tokenized_ans, self.token_indexers)
+
+            answer_vocab = {"yes": 0, "no": 1, "maybe": 2}
+            label_field = LabelField(str(tokenized_ans))
+            # label_field = TextField(tokenized_ans, self.token_indexers)
+
             fields = {'text': text_field, 'label': label_field}
             yield Instance(fields)
 
