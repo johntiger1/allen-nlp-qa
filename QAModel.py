@@ -28,6 +28,8 @@ from allennlp.training.metrics import CategoricalAccuracy, Auc
 from allennlp.training.optimizers import AdamOptimizer
 from allennlp.training.trainer import Trainer, GradientDescentTrainer
 from allennlp.training.util import evaluate
+
+@Model.register("QAClassifier")
 class QAClassifier(Model):
     def __init__(self,
                  vocab: Vocabulary,

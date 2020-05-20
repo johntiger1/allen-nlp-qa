@@ -49,7 +49,7 @@ It is true that we could have attention and such with our regular framework.
 however, allen-nlp may be better for attention, and already implemeneted seq2vec interfaces
 '''
 
-
+@DatasetReader.register("PubMedQADatasetReader-json")
 class PubMedQADatasetReader(DatasetReader):
     def __init__(self,
                  lazy: bool = False,
@@ -61,10 +61,11 @@ class PubMedQADatasetReader(DatasetReader):
                  ):
         super().__init__(lazy)
         self.tokenizer = tokenizer or WhitespaceTokenizer()
-        self.token_indexers = token_indexers or {'tokens': SingleIdTokenIndexer()}
+        self.token_indexers = token_indexers or {'tokens': SingleIdTokenIndexer()} # is it possible the tokens are no longer identical?
         self.max_tokens = max_tokens
         self.listfile = listfile
         self.notes_dir = notes_dir
+        self.neg_samp_prob = 0.2
 
     def get_stats(self, file_path: str):
         '''
@@ -100,16 +101,27 @@ class PubMedQADatasetReader(DatasetReader):
             ans = datum['final_decision']
             ans = re.sub("[^a-zA-Z0-9\s]", "", ans)
 
+            long_ans = datum["LONG_ANSWER"]
+            long_ans = re.sub("[^a-zA-Z0-9\s]", "", long_ans)
+
 
             tokenized_ques = self.tokenizer.tokenize(ques)
             tokenized_ans = self.tokenizer.tokenize(ans)
+            tokenized_long_ans = self.tokenizer.tokenize(long_ans)
+
             text_field = TextField(tokenized_ques, self.token_indexers)
 
-            answer_vocab = {"yes": 0, "no": 1, "maybe": 2}
+            # answer_vocab = {"yes": 0, "no": 1, "maybe": 2}
             label_field = LabelField(str(tokenized_ans))
+
+            long_answer = TextField(tokenized_long_ans, self.token_indexers)
+
             # label_field = TextField(tokenized_ans, self.token_indexers)
 
-            fields = {'text': text_field, 'label': label_field}
+            fields = {'text': text_field, 'label': label_field, "long_answer": long_answer}
+
+            # '''we also need to pass in whether we are training or predicting here!'''
+            # if "No" in tokenized_ans:
             yield Instance(fields)
 
 # setting the lazy flag will help a lot with memory issues
