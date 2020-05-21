@@ -1,7 +1,7 @@
 from allennlp.data import Vocabulary, DataLoader
 
-from QADatasetReader import PubMedQADatasetReader
-from QAModel import QAClassifier
+from QADir.QADatasetReader import PubMedQADatasetReader
+from QADir.QAModel import QAClassifier
 from allennlp.models import Model
 from allennlp.modules import TextFieldEmbedder, Seq2VecEncoder
 from allennlp.modules.text_field_embedders import BasicTextFieldEmbedder
@@ -17,7 +17,7 @@ from allennlp.training.metrics import CategoricalAccuracy, Auc
 from allennlp.training.optimizers import AdamOptimizer
 from allennlp.training.trainer import Trainer, GradientDescentTrainer
 from allennlp.training.util import evaluate
-
+from allennlp.data.samplers.samplers import  WeightedRandomSampler
 import torch
 import gc
 import tempfile
@@ -38,7 +38,7 @@ def build_trainer(
         serialization_dir=serialization_dir,
         data_loader=train_loader,
         validation_data_loader=dev_loader,
-        num_epochs=5,
+        num_epochs=10,
         optimizer=optimizer,
         cuda_device=0
     )
@@ -91,7 +91,7 @@ def main():
     # code, above in the Setup section. We run the training loop to get a trained
     # model.
 
-    dataset_reader = PubMedQADatasetReader()
+    dataset_reader = PubMedQADatasetReader() # we only have one reader, which SST's the vocab/indexing
 
 
     # These are a subclass of pytorch Datasets, with some allennlp-specific
@@ -111,6 +111,9 @@ def main():
     model = QAClassifier(vocab,embedder, encoder)
     train_data.index_with(vocab)
     dev_data.index_with(vocab)
+
+    # sampler =WeightedRandomSampler ([]) # need to ensure 0/1 correspond to yes/no
+    # # samples from the array, according to the probs. in this case, we need to have the labels, anyways!
     train_loader = DataLoader(train_data, batch_size=args.batch_size, shuffle=True)
     dev_loader = DataLoader(dev_data, batch_size=args.batch_size, shuffle=False)
     model = run_training_loop(model,train_loader, dev_loader, vocab, use_gpu=True, batch_size=args.batch_size)
