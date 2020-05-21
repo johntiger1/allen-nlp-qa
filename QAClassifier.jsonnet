@@ -1,16 +1,16 @@
 {
     "dataset_reader" : {
-        "type": "PubMedQADatasetReader",
+        "type": "PubMedQADatasetReader-json",
         "token_indexers": {
             "tokens": {
                 "type": "single_id"
             }
         }
     },
-    "train_data_path": "data/movie_review/train.tsv",
-    "validation_data_path": "data/movie_review/dev.tsv",
+    "train_data_path": "/scratch/gobi1/johnchen/new_git_stuff/lxmert/standalone_seq2seq/data/ori_pqaa.json",
+    "validation_data_path": "/scratch/gobi1/johnchen/new_git_stuff/lxmert/standalone_seq2seq/data/ori_pqal.json",
     "model": {
-        "type": "PubMedQADatasetReader",
+        "type": "QAClassifier",
         "embedder": {
             "token_embedders": {
                 "tokens": {
