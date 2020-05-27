@@ -2,10 +2,6 @@
 
 For the PubMedQA dataset.
 
-Don't feel like I'm working enough!
-
-Practice some eigenvalue and such problems
-
 '''
 
 import tempfile
@@ -59,7 +55,7 @@ class PubMedQADatasetReader(DatasetReader):
                  listfile: str = "/scratch/gobi1/johnchen/new_git_stuff/multimodal_fairness/data/in-hospital-mortality/train/listfile.csv",
                  notes_dir: str = "/scratch/gobi1/johnchen/new_git_stuff/multimodal_fairness/data/extracted_notes",
                  ):
-        super().__init__(lazy)
+        super().__init__(lazy, max_instances=1000)
         self.tokenizer = tokenizer or WhitespaceTokenizer()
         self.token_indexers = token_indexers or {'tokens': SingleIdTokenIndexer()} # is it possible the tokens are no longer identical?
         self.max_tokens = max_tokens
