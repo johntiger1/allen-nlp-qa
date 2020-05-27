@@ -21,7 +21,7 @@ from allennlp.data.samplers.samplers import  WeightedRandomSampler
 import torch
 import gc
 import tempfile
-
+import copy
 def build_trainer(
     model: Model,
     serialization_dir: str,
@@ -60,14 +60,14 @@ def run_training_loop(model, train_loader, dev_loader, vocab, use_gpu=False, bat
 
     # You obviously won't want to create a temporary file for your training
     # results, but for execution in binder for this course, we need to do this.
-    with tempfile.TemporaryDirectory() as serialization_dir:
-        trainer = build_trainer(
-            model,
-            serialization_dir,
-            train_loader,
-            dev_loader
-        )
-        trainer.train()
+    serialization_dir =  "/scratch/gobi1/johnchen/new_git_stuff/allen-nlp-qa/ser_dir"
+    trainer = build_trainer(
+        model,
+        serialization_dir,
+        train_loader,
+        dev_loader
+    )
+    trainer.train()
     del train_loader
     del dev_loader
     gc.collect()
@@ -93,12 +93,21 @@ def main():
 
     dataset_reader = PubMedQADatasetReader() # we only have one reader, which SST's the vocab/indexing
 
+    # instead, we can just deepcopy the other object. Then, we can modify the paths and such as necessary!
+    valid_dataset_reader =     copy.deepcopy(dataset_reader)
+
 
     # These are a subclass of pytorch Datasets, with some allennlp-specific
     # functionality added.
     train_data= dataset_reader.read("/scratch/gobi1/johnchen/new_git_stuff/lxmert/standalone_seq2seq/data/ori_pqaa.json")
-    dev_data = dataset_reader.read("/scratch/gobi1/johnchen/new_git_stuff/lxmert/standalone_seq2seq/data/ori_pqal.json")
+    dev_data = valid_dataset_reader.read("/scratch/gobi1/johnchen/new_git_stuff/lxmert/standalone_seq2seq/data/ori_pqal.json")
     vocab = Vocabulary.from_instances(train_data + dev_data)
+    valid_dataset_reader.vocab = vocab
+
+    import os
+    import pickle
+    with open(os.path.join("/scratch/gobi1/johnchen/new_git_stuff/allen-nlp-qa/ser_dir","dataset_reader.pkl"), "wb") as file:
+        pickle.dump(dataset_reader, file)
 
     vocab_size = vocab.get_vocab_size("tokens")
     # turn the tokens into 300 dim embedding. Then, turn the embeddings into encodings
@@ -117,6 +126,10 @@ def main():
     train_loader = DataLoader(train_data, batch_size=args.batch_size, shuffle=True)
     dev_loader = DataLoader(dev_data, batch_size=args.batch_size, shuffle=False)
     model = run_training_loop(model,train_loader, dev_loader, vocab, use_gpu=True, batch_size=args.batch_size)
+
+    metrics = model.get_metrics(True)
+    metrics = model.get_metrics(True)
+    metrics = model.get_metrics(True)
 
     # Now we can evaluate the model on a new dataset.
     test_data = dataset_reader.read(
