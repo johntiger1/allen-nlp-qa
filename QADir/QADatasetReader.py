@@ -61,10 +61,11 @@ class PubMedQADatasetReader(DatasetReader):
                  notes_dir: str = "/scratch/gobi1/johnchen/new_git_stuff/multimodal_fairness/data/extracted_notes",
                  train_file: str= None,
                  test_file:    str = None,
-                 num_classes: int = 2
+                 num_classes: int = 2,
+                 limit_examples: int = 10000
 
     ):
-        super().__init__(lazy, max_instances=1000)
+        super().__init__(lazy)
         self.tokenizer = tokenizer or WhitespaceTokenizer()
         self.token_indexers = token_indexers or {'tokens': SingleIdTokenIndexer()} # is it possible the tokens are no longer identical?
         self.max_tokens = max_tokens
@@ -76,16 +77,12 @@ class PubMedQADatasetReader(DatasetReader):
         '''
         
         '''
-        self.limit_examples = None
+        self.limit_examples = limit_examples
         self.sampler_type = "balanced"
         self.mode = "train"
         self.sampled_idx = {}
         self.train_file = train_file
         self.test_file = test_file
-
-        self.set_sampled_idx("train", self.train_file)
-        self.set_sampled_idx("test", self.test_file)
-
         self.num_classes = num_classes
         self.labels_vocab_mapping = {
 
@@ -93,10 +90,16 @@ class PubMedQADatasetReader(DatasetReader):
             "no": 1,
             "maybe": 2
         }
+        print(len(self.labels_vocab_mapping))
+
+        self.set_sampled_idx("train", self.train_file)
+        self.set_sampled_idx("test", self.test_file)
+
 
 
     # Populates the sampled idx for the given mode specified by name
     def set_sampled_idx(self, name, file_path):
+        import numpy as np
         labels = []
 
         assert self.num_classes == len(self.labels_vocab_mapping)
@@ -106,7 +109,7 @@ class PubMedQADatasetReader(DatasetReader):
 
         for key,datum in self.json_obj.items():
             ans = datum['final_decision']
-            labels.append(ans)
+            labels.append(self.labels_vocab_mapping[ans])
             class_counts[self.labels_vocab_mapping[ans]] += 1
 
 
@@ -119,11 +122,11 @@ class PubMedQADatasetReader(DatasetReader):
         num_samples = self.limit_examples if self.limit_examples else len(all_label_weights)
         num_samples = min(num_samples, len(all_label_weights))
 
-        if self.args.sampler_type == "balanced":
+        if self.sampler_type == "balanced":
             sampler = torch.utils.data.sampler.WeightedRandomSampler(weights=all_label_weights,
                                                                      num_samples=num_samples,
                                                                      replacement=False)
-        elif self.args.sampler_type == "random":
+        elif self.sampler_type == "random":
             sampler = torch.utils.data.sampler.SubsetRandomSampler(indices=[i for i in range(len(all_label_weights))])
         else:
             # logger.critical("Weird sampler specified \n")
@@ -195,14 +198,14 @@ class PubMedQADatasetReader(DatasetReader):
                 yield Instance(fields)
 
 
-
+# this code is executed when imported
 # setting the lazy flag will help a lot with memory issues
-pmqad_reader = PubMedQADatasetReader(lazy=True)
-
-
-instances = pmqad_reader.read("/scratch/gobi1/johnchen/new_git_stuff/lxmert/standalone_seq2seq/data/ori_pqal.json")
-
-for elt in instances:
-    print(elt)
+# pmqad_reader = PubMedQADatasetReader(lazy=True)
+#
+#
+# instances = pmqad_reader.read("/scratch/gobi1/johnchen/new_git_stuff/lxmert/standalone_seq2seq/data/ori_pqal.json")
+#
+# for elt in instances:
+#     print(elt)
 
 '''i wanna introduce a dataset, at some point'''

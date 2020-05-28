@@ -1,7 +1,8 @@
 from allennlp.data import Vocabulary, DataLoader
 
-from QADir.QADatasetReader import PubMedQADatasetReader
-from QADir.QAModel import QAClassifier
+from QADatasetReader import PubMedQADatasetReader
+from QAModel import QAClassifier
+
 from allennlp.models import Model
 from allennlp.modules import TextFieldEmbedder, Seq2VecEncoder
 from allennlp.modules.text_field_embedders import BasicTextFieldEmbedder
@@ -40,11 +41,12 @@ def build_trainer(
         validation_data_loader=dev_loader,
         num_epochs=10,
         optimizer=optimizer,
-        cuda_device=0
+        cuda_device=0,
+        validation_metric="+accuracy"
     )
     return trainer
 
-def run_training_loop(model, train_loader, dev_loader, vocab, use_gpu=False, batch_size =32):
+def run_training_loop(model, train_loader, dev_loader, vocab, use_gpu=False, batch_size =32, ser_dir=None):
     # move the model over, if necessary, and possible
     gpu_device = torch.device("cuda:0" if use_gpu  else "cpu")
     model = model.to(gpu_device)
@@ -60,12 +62,13 @@ def run_training_loop(model, train_loader, dev_loader, vocab, use_gpu=False, bat
 
     # You obviously won't want to create a temporary file for your training
     # results, but for execution in binder for this course, we need to do this.
-    serialization_dir =  "/scratch/gobi1/johnchen/new_git_stuff/allen-nlp-qa/ser_dir"
+    serialization_dir =  ser_dir
     trainer = build_trainer(
         model,
         serialization_dir,
         train_loader,
         dev_loader
+
     )
     trainer.train()
     del train_loader
@@ -76,7 +79,7 @@ def run_training_loop(model, train_loader, dev_loader, vocab, use_gpu=False, bat
 def main():
 
     args = lambda x: None
-    args.batch_size = 64
+    args.batch_size = 256
     import time
 
     start_time = time.time()
@@ -91,7 +94,10 @@ def main():
     # code, above in the Setup section. We run the training loop to get a trained
     # model.
 
-    dataset_reader = PubMedQADatasetReader() # we only have one reader, which SST's the vocab/indexing
+    dataset_reader = PubMedQADatasetReader(train_file="/scratch/gobi1/johnchen/new_git_stuff/lxmert/standalone_seq2seq/data/ori_pqaa.json",
+                                           test_file="/scratch/gobi1/johnchen/new_git_stuff/lxmert/standalone_seq2seq/data/ori_pqal.json",
+                                           num_classes=3,
+                                           limit_examples=None) # we only have one reader, which SST's the vocab/indexing
 
     # instead, we can just deepcopy the other object. Then, we can modify the paths and such as necessary!
     valid_dataset_reader =     copy.deepcopy(dataset_reader)
@@ -100,20 +106,28 @@ def main():
     # These are a subclass of pytorch Datasets, with some allennlp-specific
     # functionality added.
     train_data= dataset_reader.read("/scratch/gobi1/johnchen/new_git_stuff/lxmert/standalone_seq2seq/data/ori_pqaa.json")
-    dev_data = valid_dataset_reader.read("/scratch/gobi1/johnchen/new_git_stuff/lxmert/standalone_seq2seq/data/ori_pqal.json")
+    dev_data = dataset_reader.read("/scratch/gobi1/johnchen/new_git_stuff/lxmert/standalone_seq2seq/data/ori_pqal.json")
     vocab = Vocabulary.from_instances(train_data + dev_data)
-    valid_dataset_reader.vocab = vocab
+    dataset_reader.vocab = vocab
 
     import os
     import pickle
-    with open(os.path.join("/scratch/gobi1/johnchen/new_git_stuff/allen-nlp-qa/ser_dir","dataset_reader.pkl"), "wb") as file:
+
+    root_dir = "/scratch/gobi1/johnchen/new_git_stuff/allen-nlp-qa/"
+    ser_dir = os.path.join(root_dir, "no_subsample_real") #25k
+
+    if not os.path.exists(ser_dir):
+        os.makedirs(ser_dir, exist_ok=True)
+
+
+    with open(os.path.join(ser_dir,"dataset_reader.pkl"), "wb") as file:
         pickle.dump(dataset_reader, file)
 
     vocab_size = vocab.get_vocab_size("tokens")
     # turn the tokens into 300 dim embedding. Then, turn the embeddings into encodings
     embedder = BasicTextFieldEmbedder(
-        {"tokens": Embedding(embedding_dim=300, num_embeddings=vocab_size)})
-    encoder = CnnEncoder(embedding_dim=300, ngram_filter_sizes = (2,3,4,5),
+        {"tokens": Embedding(embedding_dim=200, num_embeddings=vocab_size)})
+    encoder = CnnEncoder(embedding_dim=200, ngram_filter_sizes = (2,3,4),
                          num_filters=5) # num_filters is a tad bit dangerous: the reason is that we have this many filters for EACH ngram f
 
 
@@ -125,7 +139,7 @@ def main():
     # # samples from the array, according to the probs. in this case, we need to have the labels, anyways!
     train_loader = DataLoader(train_data, batch_size=args.batch_size, shuffle=True)
     dev_loader = DataLoader(dev_data, batch_size=args.batch_size, shuffle=False)
-    model = run_training_loop(model,train_loader, dev_loader, vocab, use_gpu=True, batch_size=args.batch_size)
+    model = run_training_loop(model,train_loader, dev_loader, vocab, use_gpu=True, batch_size=args.batch_size, ser_dir=ser_dir)
 
     metrics = model.get_metrics(True)
     metrics = model.get_metrics(True)
@@ -140,6 +154,7 @@ def main():
     # results = evaluate(model, data_loader, -1, None)
     # print(results)
 
+    dataset_reader.mode = "test"
     # will cause an exception due to outdated cuda driver? Not anymore!
     results = evaluate(model, data_loader, 0, None)
 
